@@ -120,7 +120,7 @@ export class OptionsCtrl<R, T = R> {
     - No search box - the editable input *is* the search box
 */
 
-export class SelectCtrl<T, ST = T> {
+export class SelectCtrl<T> {
 
   constructor(public attrs: SelectAttrs<T>) { }
 

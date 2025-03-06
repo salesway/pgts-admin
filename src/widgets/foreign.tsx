@@ -42,14 +42,28 @@ export function Foreign<
     return attrs.repr?.(item) ?? (item as Model)?.repr?.(ctx) ?? default_render(item)
   }
 
+  function _search(search: string, item: any) {
+    const sea = search.toLowerCase()
+    const row = item?.row
+    for (let x in row) {
+      const p = row[x]
+      if (typeof p !== "string") { continue }
+      if (p.toLowerCase().includes(sea)) {
+        return true
+      }
+    }
+    return false
+
+  }
+
   return <Select
-    searchable
     ctx={ctx}
     model={o_item.p(attrs.rel)}
     options={
       options(() => select.fetch() as Promise<PgtsResult<M>[]>)
       .render(item => repr(item?.row))
       .fallbackRender(item => repr(item?.row))
+      .localFilter((search, item) => _search(search, item))
     }
   /> as Element
 
