@@ -1,4 +1,4 @@
-import { $bind, $class, $click, $disconnected, $observe, $on, $scrollable, Attrs, DisplayPromise, o, Renderable, Repeat, sym_insert } from "elt"
+import { $bind, $class, $click, $disconnected, $observe, $on, $scrollable, Attrs, DisplayPromise, If, o, Renderable, Repeat, sym_insert } from "elt"
 
 import { AdminWidget } from "./types"
 import { FormContext } from "../form-context"
@@ -24,6 +24,7 @@ export class OptionsCtrl<R, T = R> {
   constructor(public options: Options<R>) { }
 
   o_search = o("")
+
   // o_options = o(Promise.resolve([]) as Promise<ST[]>)
   o_filter = o(null as null | ((search: string, item: R, value: T, key: any) => boolean))
 
@@ -139,7 +140,6 @@ export class SelectCtrl<T> {
   el_input: HTMLInputElement | null = null
 
   o_showing_values = o(false)
-  o_search = o("")
   o_focused_idx = o(0)
 
   handleFocus(anchor: HTMLElement) {
@@ -152,6 +152,18 @@ export class SelectCtrl<T> {
 
   clear() {
     this.attrs.model.set(null)
+  }
+
+  selectCreator() {
+
+    const creator = this.opts._creator
+    if (!creator) {
+      return
+    }
+    const search = this.opts.o_search.get()
+    Promise.resolve(creator(search)).then(val => {
+      this.selectValue(val)
+    })
   }
 
   selectValue(val: T) {
@@ -190,6 +202,11 @@ export class SelectCtrl<T> {
       this.o_focused_idx.set(Math.max(focused_idx - 10, 0))
     } else if (ev.key === "Enter") {
       const focused_opt = opts[focused_idx]
+
+      if ((focused_opt == null || ev.ctrlKey) && this.opts._creator) {
+        this.selectCreator()
+      }
+
       if (focused_opt) {
         this.selectValue(focused_opt.value)
       }
@@ -271,6 +288,12 @@ export class SelectCtrl<T> {
                 }, 1)
               }}
             </input>
+            {this.opts._creator && If(this.opts.o_search, () => <span class={css.create_button} >
+            🞤
+              {$click(() => {
+                this.selectCreator()
+              })}
+            </span>)}
           </div>}
 
           <e-flex style={{maxHeight: "50vh"}} column nowrap tabindex={-1}>
