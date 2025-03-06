@@ -12,7 +12,9 @@ export class FormContext<M extends ModelMaker<any>, T extends PgtsResult<M>> {
     public item: o.Observable<T>,
     public options: {
       readonly?: boolean,
-      in_list?: boolean
+      in_list?: boolean,
+      /** true if the item is being created */
+      creating?: boolean,
     } = {},
   ) {
 

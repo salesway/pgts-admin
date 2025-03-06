@@ -1,6 +1,6 @@
 
 import { o, Renderable } from "elt"
-import { ModelMaker, PGWhere, SelectBuilder, PgtsResult } from "@salesway/pgts"
+import { ModelMaker, PgtsWhere, SelectBuilder, PgtsResult } from "@salesway/pgts"
 
 /**
  The ListController
@@ -23,7 +23,7 @@ export default class ListController<MT extends ModelMaker<any>> {
   }
 
   // Pour tous les filtres sur le côté droit
-  o_more_where = o(null as null | PGWhere<MT>)
+  o_more_where = o(null as null | PgtsWhere<MT>)
 
   // o_fetched is the inital state that we use to compare the list with
   o_fetched = o([] as PgtsResult<MT>[])

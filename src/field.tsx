@@ -57,12 +57,13 @@ export class Field<MT extends ModelMaker<any>, Result extends PgtsResult<MT>, Ct
 export const cls = css`
 ${".label"} {
   font-weight: bold;
+  font-size: 0.75em;
 }
 
 ${".field_holder"} {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: 0.1em;
 }
 `

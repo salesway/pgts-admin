@@ -1,5 +1,5 @@
 import { ModelMaker, PgtsResult, SelectBuilder, PgtsWhere } from "@salesway/pgts"
-import { App, css, o, Renderable } from "elt"
+import { $observe, App, css, o, Renderable } from "elt"
 import { FormContext } from "./form-context"
 import config from "./conf"
 
@@ -35,20 +35,42 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
   }
 
   /** setup observables. What form container ? */
-  _doRender(initial_value?: Result) {
+  _renderForm(initial_value?: Result | o.Observable<Result>) {
     // When do we ask for an initial value ?
     // When do we try to get the item ?
 
+    const o_original = o(initial_value)
     const o_result = o(initial_value) as o.Observable<Result>
-    const ctx = new FormContext(this.select_base, o_result, o(false))
+    const oo_changed = o.join(o_original, o_result).tf(([o1, o2]) => o1 !== o2)
+
+    const ctx = new FormContext(this.select_base, o_result, {
+      in_list: false,
+      readonly: false,
+    })
+
     const frm = <div class={C.form_container}>
+      {$observe(o_original, (o_orig) => {
+        console.log("o_orig", o_orig)
+      })}
+      {$observe(oo_changed, changed => {
+        // console.log(changed)
+        // o_result.assign(o_original)
+      })}
       {this.render(ctx)}
     </div>
     return frm
   }
 
-  showModal(): Promise<Result> {
+  showModal() {
     // Show the form in a modal
+
+  }
+
+  _renderControls() {
+    return <div>
+      <sl-button>Save</sl-button>
+      <sl-button>Cancel</sl-button>
+    </div>
   }
 
   /**
@@ -58,6 +80,7 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
     const meta = this.select_base.model.meta
 
     return async (srv) => {
+
       const pk1 = meta.pk_fields.reduce((acc, pk) => {
         const val = srv.param(pk)
         if (val == undefined || acc == undefined) { return undefined }
@@ -69,7 +92,7 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
 
       // Get the pk from the params
       srv.view(config.view_main, () => {
-        return <div>{this._doRender(item)}</div>
+        return <div>{this._renderForm(item)}</div>
       })
 
     }
