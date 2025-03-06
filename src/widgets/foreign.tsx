@@ -42,13 +42,18 @@ export function Foreign<
     return attrs.repr?.(item) ?? (item as Model)?.repr?.(ctx) ?? default_render(item)
   }
 
+  function cmp(search: string, item: string) {
+    // also remove accents on top of lowercasing with the NFD technique
+    return item.toLowerCase().replace(/[\u0300-\u036f]/g, "").normalize("NFD").includes(search.toLowerCase().replace(/[\u0300-\u036f]/g, "").normalize("NFD"))
+  }
+
   function _search(search: string, item: any) {
     const sea = search.toLowerCase()
     const row = item?.row
     for (let x in row) {
       const p = row[x]
       if (typeof p !== "string") { continue }
-      if (p.toLowerCase().includes(sea)) {
+      if (cmp(sea, p)) {
         return true
       }
     }

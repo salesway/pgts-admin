@@ -220,9 +220,9 @@ export class SelectCtrl<T> {
     ev.stopPropagation()
   }
 
-  tryClose() {
+  tryClose(keep_focus = true) {
     if (this.resolve_promise) {
-      this.el_select.focus()
+      if (keep_focus) { this.el_select.focus() }
       this.resolve_promise.resolve(null)
       this.resolve_promise = null
     }
@@ -234,7 +234,7 @@ export class SelectCtrl<T> {
       if (this.popup?.contains(document.activeElement as Node)) {
         return
       }
-      this.tryClose()
+      this.tryClose(false)
     }, 100)
   }
 
@@ -376,8 +376,15 @@ export function Select<T>(attrs: SelectAttrs<T>) {
 
     {$on("focusin", ev => {
       ev.currentTarget.scrollIntoView({block: "nearest", behavior: "smooth"})
-      ctrl.show(ev.currentTarget as HTMLElement)
+      if (!attrs.no_open_on_focus) {
+        ctrl.show(ev.currentTarget as HTMLElement)
+      }
       ev.stopPropagation()
+    })}
+
+    {$on("focusout", ev => {
+      // ev.stopPropagation()
+      ctrl.handleBlur()
     })}
 
     {$on("keydown", ev => {
@@ -424,6 +431,7 @@ export type Options<T> =
 export interface BaseSelectAttrs<T> extends Attrs<HTMLDivElement>, AdminWidget<FormContext<any, any>, T> {
   options: OptionsCtrl<any, T> | T[] | Promise<T[]>
   size?: o.RO<"small" | "medium" | "large">
+  no_open_on_focus?: boolean
   complete?: number // how many characters to type before showing results. If 0, there is no input.
   clearable?: boolean
   disabled?: boolean
