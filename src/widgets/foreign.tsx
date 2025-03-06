@@ -1,11 +1,11 @@
 import { Model, ModelMaker, PgtsResult, SelectBuilder } from "@salesway/pgts"
-import { Attrs, o, Renderable, $click, css, $disconnected, Repeat, $scrollable, DisplayPromise } from "elt"
+import { Attrs, Renderable } from "elt"
 import { FormContext } from "../form-context"
 import { AdminWidget } from "./types"
 // import { popup } from "elt-shoelace"
 import { default_render } from "./default-render"
 
-import { Select } from "./select"
+import { options, Select } from "./select"
 
 export interface ForeignAttrs<
   M extends ModelMaker<any>,
@@ -46,9 +46,11 @@ export function Foreign<
     searchable
     ctx={ctx}
     model={o_item.p(attrs.rel)}
-    options={() => select.fetch() as Promise<PgtsResult<any>[]>}
-    render={item => repr(item?.row)}
-    render_option={item => repr(item?.row)}
+    options={
+      options(() => select.fetch() as Promise<PgtsResult<M>[]>)
+      .render(item => repr(item?.row))
+      .fallbackRender(item => repr(item?.row))
+    }
   /> as Element
 
 }

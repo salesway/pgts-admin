@@ -7,6 +7,110 @@ import css from "./select-css"
 import { Future, popup } from "elt-shoelace"
 import { SlPopup } from "elt-shoelace/lib/components"
 
+export function options<T>(options: Options<T>): OptionsCtrl<T> {
+  return new OptionsCtrl(options)
+}
+
+export interface FullOption<T, ST> {
+  option: T
+  value: ST
+  key?: any
+}
+
+
+/** Manage options for a Select */
+export class OptionsCtrl<R, T = R> {
+
+  constructor(public options: Options<R>) { }
+
+  o_search = o("")
+  // o_options = o(Promise.resolve([]) as Promise<ST[]>)
+  o_filter = o(null as null | ((search: string, item: R, value: T, key: any) => boolean))
+
+  sync_options: FullOption<R, T>[] = []
+
+  o_options = o.merge({opts: this.options, search: this.o_search}).tf<Promise<FullOption<R, T>[]>>(({opts, search}, old, prev) => {
+
+    if (old !== o.NoValue && old.opts === opts && this.o_filter.get()) {
+      return prev as Promise<FullOption<R, T>[]>
+    }
+
+    const populate_map = (opts: R[]) => {
+      const res: FullOption<R, T>[] = []
+      for (const opt of opts) {
+          let value = (this._map?.(opt) ?? opt) as T
+          let k = this._key?.(value)
+          res.push({option: opt, value, key: k})
+        }
+      this.sync_options = res
+      return res
+    }
+
+    if (typeof opts === "function") {
+      return (Promise.resolve(opts(search, new AbortController())) as Promise<R[]>).then(populate_map)
+    }
+
+    return (Promise.resolve(opts) as Promise<R[]>).then(populate_map)
+  })
+
+  sync_visible_options = [] as FullOption<R, T>[]
+  oo_visible_options = o.join(this.o_options, this.o_search, this.o_filter).tf(([opts, search, filter]) => {
+    if (!filter || !search) {
+      return opts.then(opts => {
+        this.sync_visible_options = opts
+        return opts
+      })
+    }
+
+    return opts.then(op => {
+      this.sync_visible_options = op.filter(item => filter(search, item.option, item.value, item.key))
+      return this.sync_visible_options
+    })
+  })
+
+  /** The options are searchable only if the provided function takes arguments, or only if a filter function is provided. */
+  searchable = typeof this.options === "function" && this.options.length > 1
+
+  _map: ((opt: R) => T) | null = null
+  _render: ((opt: R) => Renderable) = (t) => t?.toString()
+  _fallback_render: ((opt: T) => Renderable) = (t) => t?.toString()
+  _key: ((opt: T) => string) | null = null
+  _creator: ((opt: string) => T | Promise<T>) | null = null
+
+  localFilter(fn: (search: string, item: R) => boolean) {
+    this.o_filter.set(fn)
+    this.searchable = true
+    return this
+  }
+
+  key(fn: (opt: T) => string) {
+    this._key = fn
+    return this
+  }
+
+  /** Map needs to be a bijection. When we have map */
+  map<T2>(fn: (opt: T) => T2): OptionsCtrl<T, T2> {
+    (this as any)._map = fn
+    return this as unknown as OptionsCtrl<T, T2>
+  }
+
+  render(fn: (opt: R) => Renderable) {
+    this._render = fn
+    return this
+  }
+
+  searchCreates(fn: (opt: string) => T | Promise<T>) {
+    this._creator = fn
+    return this
+  }
+
+  fallbackRender(fn: (opt: T) => Renderable) {
+    this._fallback_render = fn
+    return this
+  }
+
+}
+
 /**
  There are three use cases:
   1. As a regular Select
@@ -18,9 +122,9 @@ import { SlPopup } from "elt-shoelace/lib/components"
 
 export class SelectCtrl<T, ST = T> {
 
-  constructor(public attrs: SelectAttrs<T, ST>) {
+  constructor(public attrs: SelectAttrs<T>) { }
 
-  }
+  opts: OptionsCtrl<T> = this.attrs.options instanceof OptionsCtrl ? this.attrs.options : options(this.attrs.options)
 
   // oo_items = o.Observable<T[]>([])
   ;[sym_insert](el: HTMLElement) {
@@ -37,54 +141,6 @@ export class SelectCtrl<T, ST = T> {
   o_showing_values = o(false)
   o_search = o("")
   o_focused_idx = o(0)
-
-  oo_options = o.join(o.tf(this.attrs.options, opt => Promise.resolve(opt)), this.o_search)
-    .tf(([opts, search], old, prev: o.NoValue | {abort_controller: AbortController, options: Promise<ST[]>}) => {
-      const abort_controller = new AbortController()
-
-      if (prev !== o.NoValue) {
-        prev.abort_controller.abort()
-      }
-
-      return {
-        abort_controller,
-        options: opts.then(op => {
-          if (typeof op === "function") {
-            return op(search, abort_controller)
-          }
-          return op
-        }).then(opts => {
-          const ex = this.attrs.extract
-          this.o_current_options.set((opts as ST[]).map(o => ({
-            option: ex?.(o) ?? o, repr: o
-          })) as {option: T, repr?: ST}[])
-          return opts as ST[]
-        })}
-    })
-
-  o_current_options = o([] as {option: T, repr?: ST}[])
-
-  get editable() {
-    return this.attrs.editable
-  }
-
-  // getOptions(search: o.ReadonlyObservable<string>): o.ReadonlyObservable<Promise<ST[]>> {
-  //   return o.join(
-  //     this.attrs.options,
-  //     search,
-  //   ).tf(([opts, search]) => Promise.resolve(opts)
-  //     .then(opts => {
-  //       if (typeof opts === "function") {
-  //         return opts(search) as ST[] // not entirely true
-  //       }
-  //       return opts as ST[]
-  //     }).then(opts => {
-  //       this.o_current_options.set(opts)
-  //       this.o_focused_idx.set(0)
-  //       return opts
-  //     })
-  //   )
-  // }
 
   handleFocus(anchor: HTMLElement) {
     if (!this.attrs.complete) {
@@ -115,7 +171,7 @@ export class SelectCtrl<T, ST = T> {
 
   handleKeydown(ev: KeyboardEvent) {
     const focused_idx = this.o_focused_idx.get()
-    const opts = this.o_current_options.get()
+    const opts = this.opts.sync_visible_options
 
     if (!this.o_showing_values.get()) {
       if ((ev.key === "Enter" || ev.key === " " || ev.key === "ArrowDown" || ev.key === "ArrowUp" || ev.key === "PageDown" || ev.key === "PageUp")) {
@@ -135,7 +191,7 @@ export class SelectCtrl<T, ST = T> {
     } else if (ev.key === "Enter") {
       const focused_opt = opts[focused_idx]
       if (focused_opt) {
-        this.selectValue(focused_opt.option)
+        this.selectValue(focused_opt.value)
       }
     } else if (ev.key === "Escape") {
       this.tryClose()
@@ -161,7 +217,6 @@ export class SelectCtrl<T, ST = T> {
       if (this.popup?.contains(document.activeElement as Node)) {
         return
       }
-      console.log("handleBlur", this.popup, document.activeElement)
       this.tryClose()
     }, 100)
   }
@@ -192,8 +247,6 @@ export class SelectCtrl<T, ST = T> {
       >
         {node => { this.popup = node }}
 
-        {$observe(this.oo_options, () => { })}
-
         {$click(ev => {
           ev.stopPropagation()
         })}
@@ -205,9 +258,9 @@ export class SelectCtrl<T, ST = T> {
 
         <div class={css.select_popup}>
 
-          {this.attrs.searchable && <div class={css.search_box}>
+          {this.opts.searchable && <div class={css.search_box}>
             <input size="small" class={css.input} placeholder="Search">
-              {$bind.string(this.o_search)}
+              {$bind.string(this.opts.o_search)}
               {$disconnected(ev => {
                 this.el_select.tabIndex = 0
               })}
@@ -229,12 +282,12 @@ export class SelectCtrl<T, ST = T> {
             })}
 
             {$scrollable}
-            {DisplayPromise(this.oo_options.p("options"))
+            {DisplayPromise(this.opts.oo_visible_options)
               .WhileWaiting(() => <div class={css.loading_cont}><sl-spinner/></div>)
               .WhenResolved(o_res => {
-                const labelfn = this.attrs.render_option
+                const labelfn = this.opts._render
 
-                return Repeat(this.o_current_options, (opt, o_idx) => {
+                return Repeat(o_res, (opt, o_idx) => {
                   const o_equals = o.join(this.attrs.model, opt).tf(([mod, opt]) => {
                     if (Array.isArray(mod)) {
                       return mod.includes(opt.option)
@@ -265,7 +318,7 @@ export class SelectCtrl<T, ST = T> {
                       })}
                       <e-box grow>
                         {"\u200C"}
-                        {o.tf(opt, val => labelfn?.(val.repr ?? val.option as any) ?? val?.option?.toString())}
+                        {o.tf(opt, val => labelfn?.(val.option) ?? val?.option?.toString())}
                       </e-box>
                       {o_equals.tf(v => v && <span>✓</span>)}
                     </e-flex>
@@ -285,7 +338,7 @@ export class SelectCtrl<T, ST = T> {
 
 }
 
-export function Select<T, ST = T>(attrs: SelectAttrs<T, ST>) {
+export function Select<T>(attrs: SelectAttrs<T>) {
   const ctrl = new SelectCtrl(attrs)
 
   return <div class={css.select} tabindex={0}>
@@ -308,16 +361,16 @@ export function Select<T, ST = T>(attrs: SelectAttrs<T, ST>) {
       ctrl.handleKeydown(ev)
     })}
 
-
     {attrs.multiple && Repeat(attrs.model, o_m => <e-flex inline gap="2x-small" align="baseline" class={css.tag} part="tag" >
-      {o.tf(o_m, m => <span>{attrs.render?.(m as any) ?? m?.toString()}</span>)}
+      {o.tf(o_m, m => <span>{ctrl.opts._fallback_render(m as any) ??  m?.toString()}</span>)}
       {attrs.tag_click_removes && [$click(ev => {
         ev.preventDefault()
+        ev.stopPropagation()
         ctrl.selectValue(o.get(o_m) as T)
       }), <span>×</span>]}
     </e-flex>)}
 
-    {!attrs.multiple && <span>{o.tf(attrs.model, m => attrs.render?.(m as any) ?? m?.toString())}</span>}
+    {!attrs.multiple && <span>{o.tf(attrs.model, m => ctrl.opts._fallback_render(m as any) ??  m?.toString())}</span>}
 
     {ctrl}
 
@@ -336,48 +389,33 @@ export function Select<T, ST = T>(attrs: SelectAttrs<T, ST>) {
 Select.css = css
 
 
+
 export type Options<T> =
-  | T[]
-  | Promise<T[]>
   | o.ReadonlyObservable<T[]>
   | o.ReadonlyObservable<Promise<T[]>>
-  | ((search: string) => T[])
-  | ((search: string, abort: AbortController) => Promise<T[]>)
+  | T[]
+  | Promise<T[]>
+  | ((search: string, abort: AbortController) => T[] | Promise<T[]>)
 
 
-export interface BaseSelectAttrs<T, ST> extends Attrs<HTMLDivElement>, AdminWidget<FormContext<any, any>, T> {
-  extract?: (item: ST) => T
-  options: Options<ST>
+export interface BaseSelectAttrs<T> extends Attrs<HTMLDivElement>, AdminWidget<FormContext<any, any>, T> {
+  options: OptionsCtrl<any, T> | T[] | Promise<T[]>
   size?: o.RO<"small" | "medium" | "large">
   complete?: number // how many characters to type before showing results. If 0, there is no input.
   clearable?: boolean
   disabled?: boolean
-  editable?: boolean
-  searchable?: boolean
-  search_create?: true | ((v: string) => T)
-  render?: (item: T) => Renderable
 }
 
-export interface SimpleOptions<T> {
-  options: Options<T>
-}
-
-export interface ComplexOptions<T, ST> {
-  options: Options<ST>
-  extract: (item: ST) => T
-  render_option: (item: ST) => Renderable
-}
-
-export interface SingleSelectAttrs<T, ST> extends BaseSelectAttrs<T, ST> {
+export interface SingleSelectAttrs<T> extends BaseSelectAttrs<T> {
   model: o.Observable<T | null>
   multiple?: false
 }
 
-export interface MultipleSelectAttrs<T, ST> extends BaseSelectAttrs<T, ST> {
+export interface MultipleSelectAttrs<T> extends BaseSelectAttrs<T> {
   model: o.Observable<T[] | null>
   tag_click_removes?: boolean
   multiple: true
 }
 
-export type SelectOrMultipleAttrs<T, ST = T> = SingleSelectAttrs<T, ST> | MultipleSelectAttrs<T, ST>
-export type SelectAttrs<T, ST = T> = SelectOrMultipleAttrs<T, ST> & (SimpleOptions<T> | ComplexOptions<T, ST>)
+export type SelectOrMultipleAttrs<T> = SingleSelectAttrs<T> | MultipleSelectAttrs<T>
+export type SelectAttrs<T> = SelectOrMultipleAttrs<T>
