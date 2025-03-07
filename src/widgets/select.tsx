@@ -334,7 +334,7 @@ export class SelectCtrl<T> {
                     }}
                       {$click(() => {
                         if (o.get(this.attrs.disabled)) return
-                        this.selectValue(o.get(opt).option)
+                        this.selectValue(o.get(opt).value)
                         if (!this.attrs.multiple) {
                           fut.resolve(null)
                         }

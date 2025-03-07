@@ -1,5 +1,5 @@
 import { Model, ModelMaker, PgtsResult, SelectBuilder } from "@salesway/pgts"
-import { Attrs, Renderable } from "elt"
+import { Attrs, o, Renderable } from "elt"
 import { FormContext } from "../form-context"
 import { AdminWidget } from "./types"
 // import { popup } from "elt-shoelace"
@@ -38,8 +38,8 @@ export function Foreign<
 
   const select = rel.model().select(attrs.select as any ?? ((s) => s))
 
-  function repr(item: InstanceType<ReturnType<M["meta"]["rels"][K]["model"]>>) {
-    return attrs.repr?.(item) ?? (item as Model)?.repr?.(ctx) ?? default_render(item)
+  function repr(item: PgtsResult<M>) {
+    return attrs.repr?.(item?.row) ?? (item?.row as Model)?.repr?.(ctx) ?? default_render(item)
   }
 
   function cmp(search: string, item: string) {
@@ -63,11 +63,11 @@ export function Foreign<
 
   return <Select
     ctx={ctx}
-    model={o_item.p(attrs.rel)}
+    model={o_item.p(attrs.rel) as o.Observable<PgtsResult<M>>}
     options={
       options(() => select.fetch() as Promise<PgtsResult<M>[]>)
-      .render(item => repr(item?.row))
-      .fallbackRender(item => repr(item?.row))
+      .render(item => repr(item))
+      .fallbackRender(item => repr(item))
       .localFilter((search, item) => _search(search, item))
     }
   /> as Element
