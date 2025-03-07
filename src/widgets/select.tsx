@@ -346,6 +346,7 @@ export class SelectCtrl<T> {
                       {o_equals.tf(v => v && <span>✓</span>)}
                     </e-flex>
                   })
+                  .DisplayWhenEmpty(() => <div class={[css.item, css.no_results]}>∅ No results</div>)
                 })}
         </e-flex>
       </div>

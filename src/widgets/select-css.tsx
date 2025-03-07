@@ -122,4 +122,8 @@ ${".create_button"}:hover {
   background: var(--sl-color-primary-600);
 }
 
+${".no_results"} {
+  color: var(--sl-color-neutral-400);
+}
+
 `
