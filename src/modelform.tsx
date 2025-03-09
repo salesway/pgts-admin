@@ -2,6 +2,7 @@ import { ModelMaker, PgtsResult, SelectBuilder, PgtsWhere } from "@salesway/pgts
 import { $observe, App, css, o, Renderable } from "elt"
 import { FormContext } from "./form-context"
 import config from "./conf"
+import { show } from "elt-shoelace"
 
 
 /**
@@ -10,7 +11,7 @@ import config from "./conf"
 export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>> {
 
   public constructor(
-    public readonly select_base: SelectBuilder<MT, Result>,
+    public readonly select: SelectBuilder<MT, Result>,
     public readonly render: (ctx: FormContext<MT, Result>) => Renderable,
     _conf?: Partial<typeof config>,
   ) {
@@ -27,7 +28,7 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
 
   async getItem(where: PgtsWhere<MT>): Promise<Result | undefined> {
     // needs some where ?
-    const res = await this.select_base.where(where).fetch()
+    const res = await this.select.where(where).fetch()
     if (res.length === 0) {
       return undefined
     }
@@ -41,28 +42,33 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
 
     const o_original = o(initial_value)
     const o_result = o(initial_value) as o.Observable<Result>
-    const oo_changed = o.join(o_original, o_result).tf(([o1, o2]) => o1 !== o2)
 
-    const ctx = new FormContext(this.select_base, o_result, {
+    const ctx = new FormContext(this.select, o_result, {
       in_list: false,
       readonly: false,
     })
 
     const frm = <div class={C.form_container}>
-      {$observe(o_original, (o_orig) => {
-        console.log("o_orig", o_orig)
-      })}
-      {$observe(oo_changed, changed => {
-        // console.log(changed)
-        // o_result.assign(o_original)
-      })}
       {this.render(ctx)}
     </div>
     return frm
   }
 
   showModal() {
-    // Show the form in a modal
+    return show(fut => {
+      const o_item = o(new this.select.model())
+
+      return <sl-dialog no-header>
+        <e-box>
+          {this._renderForm(o_item)}
+        </e-box>
+        <e-flex slot="footer" gap>
+          <sl-button variant="default" size="small"> Annuler </sl-button>
+          <sl-button variant="primary" size="small"> Créer </sl-button>
+        </e-flex>
+      </sl-dialog>
+
+    })    // Show the form in a modal
 
   }
 
@@ -77,7 +83,7 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
    *
    */
   asService(): (srv: App.Service<{[K in MT["meta"]["pk_fields"][number]]: InstanceType<MT>[K]}>) => void {
-    const meta = this.select_base.model.meta
+    const meta = this.select.model.meta
 
     return async (srv) => {
 
@@ -88,7 +94,7 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
         return acc
       }, [] as PgtsWhere<MT>[] | undefined)
 
-      const item = pk1 ? (await this.select_base.where(...pk1).fetch())[0] : this.select_base.empty()
+      const item = pk1 ? (await this.select.where(...pk1).fetch())[0] : this.select.empty()
 
       // Get the pk from the params
       srv.view(config.view_main, () => {

@@ -15,13 +15,7 @@ export interface TextAttrs extends Attrs<HTMLInputElement>, AdminWidget<FormCont
  * A text input widget.
  */
 export function Text(attrs: TextAttrs) {
-  const ctx = attrs.ctx
-
-  const original = o.get(attrs.model)
   const o_model = attrs.model
-  const oo_changed = o_model.tf(v => v !== original)
-
-  const o_propositions = o(null as null | string[])
 
   const res = <sl-input size="small">
     {$model(o_model)}
@@ -33,10 +27,3 @@ export function Text(attrs: TextAttrs) {
   </sl-input>
   return res as HTMLInputElement
 }
-
-const cls = css`
-${".changed"} {
-  --sl-primary-color: #f0f0f0;
-
-}
-`

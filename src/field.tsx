@@ -8,6 +8,7 @@ import { ValidationFn } from "./types"
 export interface FieldProperties {
   label?: Renderable,
   help?: Renderable,
+  required?: boolean,
   validation?: ValidationFn<any> | ValidationFn<any>[]
 }
 
@@ -29,7 +30,7 @@ export function fields<
         return render(attrs.ctx)
       }
       return <div class={cls.field_holder}>
-        {props.label && <div class={cls.label}>{props.label}</div>}
+        {props.label && <div class={cls.label}>{props.label}{props.required && <span>*</span>}</div>}
         {render(attrs.ctx)}
       </div>
     }

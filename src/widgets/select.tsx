@@ -364,8 +364,10 @@ export class SelectCtrl<T> {
 
 export function Select<T>(attrs: SelectAttrs<T>) {
   const ctrl = new SelectCtrl(attrs)
+  let prevent_focus_event = false
 
   return <div class={css.select} tabindex={0}>
+    <span>&zwnj;</span>
 
     {$click(ev => {
       ev.stopPropagation()
@@ -376,6 +378,10 @@ export function Select<T>(attrs: SelectAttrs<T>) {
     })}
 
     {$on("focusin", ev => {
+      if (prevent_focus_event) {
+        prevent_focus_event = false
+        return
+      }
       ev.currentTarget.scrollIntoView({block: "nearest", behavior: "smooth"})
       if (!attrs.no_open_on_focus) {
         ctrl.show(ev.currentTarget as HTMLElement)
@@ -392,26 +398,36 @@ export function Select<T>(attrs: SelectAttrs<T>) {
       ctrl.handleKeydown(ev)
     })}
 
-    {attrs.multiple && Repeat(attrs.model, o_m => <e-flex inline gap="2x-small" align="baseline" class={css.tag} part="tag" >
-      {o.tf(o_m, m => <span>{ctrl.opts._fallback_render(m as any) ??  m?.toString()}</span>)}
-      {attrs.tag_click_removes && [$click(ev => {
-        ev.preventDefault()
-        ev.stopPropagation()
-        ctrl.selectValue(o.get(o_m) as T)
-      }), <span>×</span>]}
-    </e-flex>)}
-
-    {!attrs.multiple && <span>{o.tf(attrs.model, m => ctrl.opts._fallback_render(m as any) ??  m?.toString())}</span>}
+    <span class={css.content}>
+      {attrs.multiple ?
+        Repeat(attrs.model, o_m =>
+          <e-flex inline gap="2x-small" align="baseline" class={css.tag} part="tag" >
+            {o.tf(o_m, m => <span>{ctrl.opts._fallback_render(m as any) ??  m?.toString()}</span>)}
+            {attrs.tag_click_removes && [$click(ev => {
+              prevent_focus_event = true
+              ev.preventDefault()
+              ev.stopPropagation()
+              ctrl.selectValue(o.get(o_m) as T)
+            }), <span>×</span>]}
+          </e-flex>
+        )
+        :
+        <span>{o.tf(attrs.model, m => ctrl.opts._fallback_render(m as any) ??  m?.toString())}</span>
+      }
+    </span>
 
     {ctrl}
 
     <span class={[css.arrow, ctrl.o_showing_values.tf(v => v && css.arrow_open)]}>▿</span>
-    {attrs.clearable && <span>
-      {$click(() => {
+    {attrs.clearable && If(ctrl.attrs.model, () => <span class={css.clear_button}>
+      {$on("mousedown",ev => {
+        prevent_focus_event = true
         ctrl.clear()
+        ev.stopPropagation()
+        ev.preventDefault()
       })}
       ×
-    </span>}
+    </span>, () => <span>&zwnj;</span>)}
 
   </div>
 

@@ -61,9 +61,29 @@ export function Foreign<
 
   }
 
+  const o_model = o_item.tf(item => {
+    return item[attrs.rel] as PgtsResult<M>
+  }, (newvalue, _, prev) => {
+    let chg: {[key: string]: any} = {[attrs.rel]: newvalue, row: {}}
+    for (let i = 0, l = rel.from_columns.length; i < l; i++) {
+      const c = rel.from_columns[i]
+      const t = rel.to_columns[i]
+      const v = newvalue?.row[t] ?? null
+      const pv = prev.row[c]
+      if (v !== pv) {
+        chg.row[c] = v
+      }
+    }
+
+    const res = o.assign(prev, chg as any)
+    return res
+  })
+
+
   return <Select
     ctx={ctx}
-    model={o_item.p(attrs.rel) as o.Observable<PgtsResult<M>>}
+    model={o_model}
+    clearable={rel.is_null}
     options={
       options(() => select.fetch() as Promise<PgtsResult<M>[]>)
       .render(item => repr(item))
