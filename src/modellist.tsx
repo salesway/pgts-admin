@@ -1,15 +1,21 @@
-import { $click, $observe_changes, $on, $scrollable, App, If, o, Renderable, VirtualScroller } from "elt"
-import { ModelMaker, SelectBuilder, PgtsResult, Model } from "@salesway/pgts"
+import { $click, $observe, $observe_changes, $on, $scrollable, App, If, o, Renderable, RepeatScroll, tf_array_filter, VirtualScroll, VirtualScroller } from "elt"
+import { ModelMaker, SelectBuilder, PgtsResult, Model, PgtsWhere } from "@salesway/pgts"
 
 import config from "./conf"
 import { FormContext } from "./form-context"
-import { ModelForm } from "./modelform"
+import { ModalOptions, ModelForm } from "./modelform"
 import css from "./modellist.style"
+import { $model, modal } from "elt-shoelace"
 
 
 export interface ModelListOptions<MT extends ModelMaker<any>, Result extends PgtsResult<MT>> {
   side_form?: () => ModelForm<MT, Result>,
+  create_form?: () => ModelForm<MT, Result>,
+  allow_create?: boolean | (() => o.assign.AssignPartial<Result> | Promise<o.assign.AssignPartial<Result>>)
+  allow_delete?: boolean
   container_fn?: (node: HTMLElement) => Renderable,
+  local_search?: (item: Result, search: string) => boolean
+  title?: Renderable
 }
 
 export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>> {
@@ -24,6 +30,20 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
 
   o_fetched = o<Result[]>([])
   o_list = o(this.o_fetched)
+  o_search = o("")
+
+  oo_display_list = this.options.local_search ? this.o_list.tf(tf_array_filter(this.o_search.tf(search => {
+
+    if (search === "") {
+      return () => true
+    }
+
+    const fn = this.options.local_search ?? (() => true)
+
+    return (element: Result) => {
+      return fn(element, search)
+    }
+  }))) : this.o_list
 
   /** A map of changes */
   o_changes_history = o([] as Map<string, Result>[])
@@ -37,7 +57,7 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
   o_single_selected = o.proxy(this.o_single_none)
 
   title() {
-    return this.select.model.name
+    return this.options.title ?? this.select.model.name
   }
 
   undo() {
@@ -72,9 +92,16 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
     this.o_changes_redo.set([])
   }
 
+  asInline() {
+    // this.fetch()
+    return <>
+      {this.renderListBody()}
+    </>
+  }
+
   renderListBody() {
     return <>
-      <e-flex  gap pad nowrap grow align="stretch" style={{overflow: "hidden"}}>
+      <e-flex gap pad nowrap grow align="stretch" style={{overflow: "hidden"}}>
         {$on("keydown", ev => {
           if (ev.key == "s" && ev.ctrlKey) {
             this.save()
@@ -93,8 +120,8 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
             <div class={css.header_row}>
               {this.render_header(this)}
             </div>
-            {new VirtualScroller(this.o_list)
-            .RenderEach((o_item) => {
+            {RepeatScroll(this.oo_display_list, (o_item, n) => {
+
               const ctx = new FormContext(this.select, o_item, {
                 readonly: true, // ?
                 in_list: true,
@@ -117,13 +144,43 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
         </e-box>
         {this.options.side_form && If(this.o_single_selected, (o_item) => {
           const frm = this.options.side_form!()
-          return <e-box relative style={{flexShrink: "1"}}>
+          return <e-flex column relative gap nowrap>
             <sl-button style={{position: "absolute", top: "0", right: "0"}} size="small" variant="default">
               {$click(() => this.o_single_selected.changeTarget(this.o_single_none))}
               ×
             </sl-button>
             {frm._renderForm(o_item)}
-          </e-box>
+            <e-flex justify="end" gap>
+              {this.options.allow_delete &&
+                <sl-button size="small" variant="primary">
+                {$click(async () => {
+                  await modal({
+                    title: "Supprimer",
+                    text: "Êtes-vous sûr de vouloir supprimer cet élément ?",
+                    agree: "Supprimer",
+                    disagree: "Annuler",
+                  }).then(async (res) => {
+                    if (res) {
+                      await o_item.get().row.delete()
+                      this.o_fetched.mutate(fet => fet.filter(r => r.row.__strkey_pk != o_item.get().row.__strkey_pk))
+                      this.o_list.mutate(list => list.filter(r => r.row.__strkey_pk != o_item.get().row.__strkey_pk))
+                      this.o_changes.mutate(map => {
+                        map.delete(o_item.get().row.__strkey_pk)
+                        return map
+                      })
+                      this.o_current.mutate(map => {
+                        map.delete(o_item.get().row.__strkey_pk)
+                        return map
+                      })
+                      this.o_single_selected.changeTarget(this.o_single_none)
+                    }
+                  })
+                })}
+                Supprimer 💀
+                </sl-button>
+              }
+            </e-flex>
+          </e-flex>
         })}
         <e-box>
 
@@ -135,28 +192,43 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
     </>
   }
 
-  async fetch() {
-    const list = await this.select.fetch()
+  async fetch(...where: PgtsWhere<any>[]) {
+    const select = where.length ? this.select.where(...where) : this.select
+    const list = await select.where(...where).fetch()
     this.o_fetched.assign(list)
     this.o_list.assign(list)
   }
 
   asService() {
 
-    return async (srv: App.Service<{[K in keyof MT["meta"]["pk_fields"]]: string}>) => {
+    return async (srv: App.Service<any>) => {
       this.fetch()
       await srv.require(import("./admin-base"))
 
       srv.view("Toolbar", () => <>
-        <e-box grow>{this.title()}</e-box>
+        <e-box>{this.title()}</e-box>
+        {this.options.local_search && <sl-input placeholder="Rechercher" size="small">{$model(this.o_search)}</sl-input>}
+
+        {/** Spacer */}
+        <e-box grow data-desc="spacer"></e-box>
+
         {If(this.o_current.p("size"), () => <sl-button size="small" variant="primary">
           {$click(() => this.save())}
           Enregistrer
         </sl-button>)}
-        <sl-button size="small" variant="primary">
-          {$click(() => this.createModal())}
+        {this.options.allow_create && If(this.options.allow_create, () => <sl-button size="small" variant="primary">
+          {$click(async () => {
+            let empty = this.select.empty()
+            if (typeof this.options.allow_create === "function") {
+              const res = await this.options.allow_create()
+              empty = o.assign(empty, res)
+            }
+            this.createModal({
+              initial: empty
+            })
+          })}
           Créer 🞤
-        </sl-button>
+        </sl-button>)}
       </>)
 
       srv.view(config.view_content, () => this.renderListBody())
@@ -164,8 +236,21 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
     }
   }
 
-  createModal() {
-    const frm = this.options.side_form!()
-    frm.showModal()
+  createModal(options: ModalOptions<MT, Result>) {
+    const frm = (this.options.create_form ?? this.options.side_form)!()
+    frm.showModal({
+      label_save: "Créer 🞤",
+      on_validate: async (item) => {
+        const sv = await item.row.save() as Result
+        if (sv) {
+          this.o_fetched.mutate(fet => [...fet, sv])
+          const o_last = this.o_fetched.p(this.o_fetched.get().length - 1)
+          this.o_single_selected.changeTarget(o_last)
+          return true
+        }
+        return false
+      },
+      ...options
+    })
   }
 }

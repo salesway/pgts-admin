@@ -32,7 +32,6 @@ export class ModelGrid<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
         node.classList.add(grid_css.grid)
         node.style.gridTemplateColumns = `repeat(${fields.length}, auto)`
         options.container_fn?.(node)
-        console.log("w=hat")
       }
     })
   }

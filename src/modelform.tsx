@@ -1,8 +1,16 @@
 import { ModelMaker, PgtsResult, SelectBuilder, PgtsWhere } from "@salesway/pgts"
-import { $observe, App, css, o, Renderable } from "elt"
+import { $click, $scrollable, App, css, o, Renderable } from "elt"
 import { FormContext } from "./form-context"
 import config from "./conf"
 import { show } from "elt-shoelace"
+
+
+export interface ModalOptions<MT extends ModelMaker<any>, Result extends PgtsResult<MT>> {
+  initial?: Result | o.Observable<Result>
+  on_validate?: (item: Result) => boolean | Promise<boolean>
+  label_save?: Renderable
+  label_cancel?: Renderable
+}
 
 
 /**
@@ -49,22 +57,38 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
     })
 
     const frm = <div class={C.form_container}>
+      {$scrollable}
       {this.render(ctx)}
     </div>
     return frm
   }
 
-  showModal() {
-    return show(fut => {
-      const o_item = o(new this.select.model())
+  async showModal(options?: ModalOptions<MT, Result>) {
+    return show<Result>(fut => {
+      const o_item = o<Result>(options?.initial as Result ?? {row: new this.select.model()} as Result)
 
       return <sl-dialog no-header>
         <e-box>
           {this._renderForm(o_item)}
         </e-box>
-        <e-flex slot="footer" gap>
-          <sl-button variant="default" size="small"> Annuler </sl-button>
-          <sl-button variant="primary" size="small"> Créer </sl-button>
+        <e-flex slot="footer" gap justify="end">
+          <sl-button variant="default" size="small">
+            {$click(() => fut.reject(null!))}
+            {options?.label_cancel ?? "Cancel"}
+          </sl-button>
+          <sl-button variant="primary" size="small">
+            {$click(async () => {
+              if (options?.on_validate) {
+                const res = await options.on_validate(o_item.get())
+                if (res) {
+                  fut.resolve(o_item.get())
+                }
+              } else {
+                fut.resolve(o_item.get())
+              }
+            })}
+            {options?.label_save ?? "Save"}
+          </sl-button>
         </e-flex>
       </sl-dialog>
 

@@ -273,7 +273,7 @@ export class SelectCtrl<T> {
           this.o_showing_values.set(false)
         })}
 
-        <div class={css.select_popup}>
+        <div class={[css.select_popup]}>
 
           {this.opts.searchable && <div class={css.search_box}>
             <input size="small" class={css.input} placeholder="Search">
@@ -400,17 +400,19 @@ export function Select<T>(attrs: SelectAttrs<T>) {
 
     <span class={css.content}>
       {attrs.multiple ?
-        Repeat(attrs.model, o_m =>
-          <e-flex inline gap="2x-small" align="baseline" class={css.tag} part="tag" >
-            {o.tf(o_m, m => <span>{ctrl.opts._fallback_render(m as any) ??  m?.toString()}</span>)}
-            {attrs.tag_click_removes && [$click(ev => {
-              prevent_focus_event = true
-              ev.preventDefault()
-              ev.stopPropagation()
-              ctrl.selectValue(o.get(o_m) as T)
-            }), <span>×</span>]}
-          </e-flex>
-        )
+        <e-flex inline gap="2x-small" align="baseline" >
+          {Repeat(attrs.model, o_m =>
+            <e-flex inline gap="2x-small" align="baseline" class={css.tag} >
+              {o.tf(o_m, m => <span>{ctrl.opts._fallback_render(m as any) ??  m?.toString()}</span>)}
+              {attrs.tag_click_removes && [$on("mousedown", ev => {
+                prevent_focus_event = true
+                ev.preventDefault()
+                ev.stopPropagation()
+                ctrl.selectValue(o.get(o_m) as T)
+              }), <span>×</span>]}
+            </e-flex>
+          )}
+        </e-flex>
         :
         <span>{o.tf(attrs.model, m => ctrl.opts._fallback_render(m as any) ??  m?.toString())}</span>
       }
@@ -418,8 +420,8 @@ export function Select<T>(attrs: SelectAttrs<T>) {
 
     {ctrl}
 
-    <span class={[css.arrow, ctrl.o_showing_values.tf(v => v && css.arrow_open)]}>▿</span>
-    {attrs.clearable && If(ctrl.attrs.model, () => <span class={css.clear_button}>
+    <span class={[css.arrow, ctrl.o_showing_values.tf(v => v && css.arrow_open)]}>▾</span>
+    {attrs.clearable ? If(ctrl.attrs.model, () => <span class={css.clear_button}>
       {$on("mousedown",ev => {
         prevent_focus_event = true
         ctrl.clear()
@@ -427,7 +429,7 @@ export function Select<T>(attrs: SelectAttrs<T>) {
         ev.preventDefault()
       })}
       ×
-    </span>, () => <span>&zwnj;</span>)}
+    </span>, () => <span>&zwnj;</span>) : <span>&zwnj;</span>}
 
   </div>
 
@@ -452,6 +454,7 @@ export interface BaseSelectAttrs<T> extends Attrs<HTMLDivElement>, AdminWidget<F
   complete?: number // how many characters to type before showing results. If 0, there is no input.
   clearable?: boolean
   disabled?: boolean
+  placeholder?: string
 }
 
 export interface SingleSelectAttrs<T> extends BaseSelectAttrs<T> {

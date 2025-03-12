@@ -83,7 +83,7 @@ export function Foreign<
   return <Select
     ctx={ctx}
     model={o_model}
-    clearable={rel.is_null}
+    clearable={rel.nullable}
     options={
       options(() => select.fetch() as Promise<PgtsResult<M>[]>)
       .render(item => repr(item))
