@@ -4,7 +4,7 @@ import { Model } from "@salesway/pgts"
 
 declare module "@salesway/pgts" {
   interface Model {
-    repr(ctx: FormContext<any, any>): Renderable
+    repr(ctx?: FormContext<any, any>): Renderable
   }
 }
 

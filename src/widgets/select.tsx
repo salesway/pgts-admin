@@ -1,4 +1,4 @@
-import { $bind, $class, $click, $disconnected, $observe, $on, $scrollable, Attrs, DisplayPromise, If, o, Renderable, Repeat, sym_insert } from "elt"
+import { $bind, $class, $click, $disconnected, $on, $scrollable, Attrs, DisplayPromise, If, o, Renderable, Repeat, sym_insert } from "elt"
 
 import { AdminWidget } from "./types"
 import { FormContext } from "../form-context"

@@ -39,7 +39,7 @@ export function Foreign<
   const select = rel.model().select(attrs.select as any ?? ((s) => s))
 
   function repr(item: PgtsResult<M>) {
-    return attrs.repr?.(item?.row) ?? (item?.row as Model)?.repr?.(ctx) ?? default_render(item)
+    return attrs.repr?.(item?.$) ?? (item?.$ as Model)?.repr?.(ctx) ?? default_render(item)
   }
 
   function cmp(search: string, item: string) {
@@ -49,7 +49,7 @@ export function Foreign<
 
   function _search(search: string, item: any) {
     const sea = search.toLowerCase()
-    const row = item?.row
+    const row = item?.$
     for (let x in row) {
       const p = row[x]
       if (typeof p !== "string") { continue }
@@ -64,14 +64,14 @@ export function Foreign<
   const o_model = o_item.tf(item => {
     return item[attrs.rel] as PgtsResult<M>
   }, (newvalue, _, prev) => {
-    let chg: {[key: string]: any} = {[attrs.rel]: newvalue, row: {}}
+    let chg: {[key: string]: any} = {[attrs.rel]: newvalue, $: {}}
     for (let i = 0, l = rel.from_columns.length; i < l; i++) {
       const c = rel.from_columns[i]
       const t = rel.to_columns[i]
-      const v = newvalue?.row[t] ?? null
-      const pv = prev.row[c]
+      const v = newvalue?.$[t] ?? null
+      const pv = prev.$[c]
       if (v !== pv) {
-        chg.row[c] = v
+        chg.$[c] = v
       }
     }
 

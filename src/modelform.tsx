@@ -1,9 +1,10 @@
 import { ModelMaker, PgtsResult, SelectBuilder, PgtsWhere } from "@salesway/pgts"
-import { $click, $scrollable, App, css, o, Renderable } from "elt"
+import { $click, $scrollable, App, o, Renderable } from "elt"
 import { FormContext } from "./form-context"
 import config from "./conf"
 import { show } from "elt-shoelace"
 
+import css from "./modelform.style"
 
 export interface ModalOptions<MT extends ModelMaker<any>, Result extends PgtsResult<MT>> {
   initial?: Result | o.Observable<Result>
@@ -56,7 +57,7 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
       readonly: false,
     })
 
-    const frm = <div class={C.form_container}>
+    const frm = <div class={css.form_container}>
       {$scrollable}
       {this.render(ctx)}
     </div>
@@ -65,7 +66,7 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
 
   async showModal(options?: ModalOptions<MT, Result>) {
     return show<Result>(fut => {
-      const o_item = o<Result>(options?.initial as Result ?? {row: new this.select.model()} as Result)
+      const o_item = o<Result>(options?.initial as Result ?? {$: new this.select.model()} as Result)
 
       return <sl-dialog no-header>
         <e-box>
@@ -130,19 +131,3 @@ export class ModelForm<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
   }
 
 }
-
-
-const C = css`
-${".form_container"} {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-${".label"} {
-  font-weight: bold;
-}
-
-`
-
-export { C as css }

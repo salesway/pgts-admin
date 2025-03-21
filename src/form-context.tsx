@@ -20,9 +20,9 @@ export class FormContext<M extends ModelMaker<any>, T extends PgtsResult<M>> {
 
   }
 
-  get o_item(): o.Observable<T["row"]> {
+  get o_item(): o.Observable<T["$"]> {
     const a = (o(this.item) as o.Observable<T>)
-    return a.p("row")
+    return a.p("$")
   }
 
   o_validation = o(new Map<any, Renderable | null>())

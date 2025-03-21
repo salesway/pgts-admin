@@ -15,10 +15,37 @@ export interface FieldProperties {
 export type FieldDefinition<MT extends ModelMaker<any>, Result extends PgtsResult<MT>> = ((attrs: Attrs<HTMLDivElement> & { ctx: FormContext<MT, Result> }) => Node) & FieldProperties
 
 
+export class FieldMaker<K extends string, MT extends ModelMaker<any>, Result extends PgtsResult<MT>> {
+  constructor(
+    public key: K,
+    public select: SelectBuilder<MT, Result>,
+    public fields: {[name: string]: FieldDefinition<MT, Result>}
+  ) {}
+}
+
+
+export function F<K extends string, MT extends ModelMaker<any>, Result extends PgtsResult<MT>,>(key: K, render: (ctx: FormContext<MT, Result>) => Renderable): FieldMaker<K, MT, Result> {
+  // return new FieldMaker(key, render)
+  return null!
+}
+
+
+export function fields2<
+  MT extends ModelMaker<any>,
+  Result extends PgtsResult<MT>,
+  Fields extends FieldMaker<any, MT, Result>[],
+>(
+  select: SelectBuilder<MT, Result>,
+  ...fields: Fields
+): {[Key in keyof Fields]: Fields[Key] extends FieldMaker<infer K, MT, Result> ? {K: Fields[Key]} : never }[number] {
+  return null!
+}
+
+
 export function fields<
   MT extends ModelMaker<any>,
   Result extends PgtsResult<MT>,
-  Fields extends {[name: string]: [render: (ctx: FormContext<MT, Result>) => Node, FieldProperties]},
+  Fields extends {[name: string]: [render: (ctx: FormContext<MT, Result>) => Renderable, FieldProperties]},
 >(
   select: SelectBuilder<MT, Result>,
   f: Fields
@@ -41,14 +68,9 @@ export function fields<
 }
 
 
-export function F<MT extends ModelMaker<any>, Result extends PgtsResult<MT>, Ctx extends FormContext<MT, Result>, T>(render: (ctx: Ctx) => Node) {
-  return new Field(render)
-}
-
-
 export class Field<MT extends ModelMaker<any>, Result extends PgtsResult<MT>, Ctx extends FormContext<MT, Result>, T> {
   constructor(
-    public render: (ctx: Ctx) => Node,
+    public render: (ctx: Ctx) => Renderable,
     // public readonly label: string,
     // public readonly help: string,
     // public readonly validation: ValidationFn<T> | ValidationFn<T>[]

@@ -17,8 +17,8 @@ export function ForeignList<
 
   return <e-flex column class={cls["inline_list"]}>
     {modellist.asInline()}
-    {ctx.item.path("row", "__strkey_pk").tf(() => {
-      const item = ctx.item.get().row
+    {ctx.item.path("$", "__strkey_pk").tf(() => {
+      const item = ctx.item.get().$
       const where: PgtsWhere<any>[] = rel.to_columns.map((c, idx): PgtsWhere<any> => [c, "eq", item[rel.from_columns[idx]]])
       modellist.fetch(...where)
     })}
@@ -36,7 +36,7 @@ extends
   Attrs<HTMLDivElement>,
   AdminWidget<
     FormContext<Source, PgtsResult<Source>>,
-    Destination["row"]
+    Destination["$"]
 > {
   rel: K
   modellist: () => ModelList<any, Destination>

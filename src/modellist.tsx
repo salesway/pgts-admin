@@ -1,4 +1,4 @@
-import { $click, $observe, $observe_changes, $on, $scrollable, App, If, o, Renderable, RepeatScroll, tf_array_filter, VirtualScroll, VirtualScroller } from "elt"
+import { $click, $observe_changes, $on, $scrollable, App, If, o, Renderable, RepeatScroll, tf_array_filter, VirtualScroll, } from "elt"
 import { ModelMaker, SelectBuilder, PgtsResult, Model, PgtsWhere } from "@salesway/pgts"
 
 import config from "./conf"
@@ -6,6 +6,8 @@ import { FormContext } from "./form-context"
 import { ModalOptions, ModelForm } from "./modelform"
 import css from "./modellist.style"
 import { $model, modal } from "elt-shoelace"
+
+import "elt-shoelace/lib/components/split-panel"
 
 
 export interface ModelListOptions<MT extends ModelMaker<any>, Result extends PgtsResult<MT>> {
@@ -53,8 +55,18 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
   o_changes = o(new Map<string, Result>())
   o_current = o(new Map<string, Result>())
 
+  o_selected = o(new Set<string>())
+
   o_single_none = o(null) as o.Observable<null | Result>
-  o_single_selected = o.proxy(this.o_single_none)
+  o_single_selected = this.o_fetched.p(o.expression(get => {
+    const selected = get(this.o_selected)
+    if (selected.size !== 1) {
+      return undefined! as number
+    }
+    const [key] = selected
+    const res = get(this.o_fetched).findIndex(r => r.$.__strkey_pk == key)
+    return res
+  }))
 
   title() {
     return this.options.title ?? this.select.model.name
@@ -70,7 +82,7 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
   pushChange(item: Result, old: Result) {
     const map_old = new Map(this.o_changes.get())
     const map_current = new Map(this.o_current.get())
-    const r = item.row as Model
+    const r = item.$ as Model
 
     map_old.set(r.__strkey_pk, old)
     map_current.set(r.__strkey_pk, item)
@@ -81,7 +93,7 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
   async save() {
     // Changes tells us who changed
     const changes = this.o_current.get()
-    const many = [...changes.values()].map(r => r.row)
+    const many = [...changes.values()].map(r => r.$)
 
     await this.select.model.saveMany(many)
 
@@ -101,7 +113,8 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
 
   renderListBody() {
     return <>
-      <e-flex gap pad nowrap grow align="stretch" style={{overflow: "hidden"}}>
+      {/*<e-flex gap pad nowrap grow align="stretch" style={{overflow: "hidden"}}>*/}
+      <sl-split-panel class={css.split_panel} position={75}>
         {$on("keydown", ev => {
           if (ev.key == "s" && ev.ctrlKey) {
             this.save()
@@ -110,7 +123,7 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
           }
         })}
 
-        <e-box style={{width: "auto"}} class={css.table_container}>
+        <e-box slot="start" style={{width: "auto", height: "100%"}} class={css.table_container}>
           {$scrollable}
 
           <e-box class={css.grid}>
@@ -126,15 +139,19 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
                 readonly: true, // ?
                 in_list: true,
               })
-              return <div class={css.list_row}>
+
+              const oo_is_selected = o.expression(get => {
+                return get(this.o_selected).has(get(o_item).$.__strkey_pk)
+              })
+
+              return <div class={[css.list_row, oo_is_selected.tf(sel => sel && css.selected)]}>
                 {$observe_changes(o_item, (item: Result, old) => {
                   this.pushChange(item, old)
                 })}
                 {$click(ev => {
                   if (ev.defaultPrevented) return
-                  this.o_single_selected.changeTarget(o_item)
-                }
-                )}
+                  this.o_selected.set(new Set([o_item.get().$.__strkey_pk]))
+                })}
                 {this.render(ctx)}
                 {/* {ctrl._list_renderers.map(r => <div>{r.render(o_item, true)}</div>)} */}
               </div> as Renderable
@@ -144,9 +161,9 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
         </e-box>
         {this.options.side_form && If(this.o_single_selected, (o_item) => {
           const frm = this.options.side_form!()
-          return <e-flex column relative gap nowrap>
+          return <e-flex slot="end" column relative grow gap nowrap class={css.side_form}>
             <sl-button style={{position: "absolute", top: "0", right: "0"}} size="small" variant="default">
-              {$click(() => this.o_single_selected.changeTarget(this.o_single_none))}
+              {$click(() => this.o_selected.set(new Set()))}
               ×
             </sl-button>
             {frm._renderForm(o_item)}
@@ -161,18 +178,18 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
                     disagree: "Annuler",
                   }).then(async (res) => {
                     if (res) {
-                      await o_item.get().row.delete()
-                      this.o_fetched.mutate(fet => fet.filter(r => r.row.__strkey_pk != o_item.get().row.__strkey_pk))
-                      this.o_list.mutate(list => list.filter(r => r.row.__strkey_pk != o_item.get().row.__strkey_pk))
+                      await o_item.get().$.delete()
+                      this.o_fetched.mutate(fet => fet.filter(r => r.$.__strkey_pk != o_item.get().$.__strkey_pk))
+                      this.o_list.mutate(list => list.filter(r => r.$.__strkey_pk != o_item.get().$.__strkey_pk))
                       this.o_changes.mutate(map => {
-                        map.delete(o_item.get().row.__strkey_pk)
+                        map.delete(o_item.get().$.__strkey_pk)
                         return map
                       })
                       this.o_current.mutate(map => {
-                        map.delete(o_item.get().row.__strkey_pk)
+                        map.delete(o_item.get().$.__strkey_pk)
                         return map
                       })
-                      this.o_single_selected.changeTarget(this.o_single_none)
+                      this.o_selected.set(new Set())
                     }
                   })
                 })}
@@ -185,7 +202,8 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
         <e-box>
 
         </e-box>
-      </e-flex>
+      </sl-split-panel>
+      {/* </e-flex> */}
       <e-flex>
         {/* <div>Selected {ctrl.o_list_selected.p("size")} / {ctrl.o_fetched.p("length")}</div> */}
       </e-flex>
@@ -241,7 +259,7 @@ export class ModelList<MT extends ModelMaker<any>, Result extends PgtsResult<MT>
     frm.showModal({
       label_save: "Créer 🞤",
       on_validate: async (item) => {
-        const sv = await item.row.save() as Result
+        const sv = await item.$.save() as Result
         if (sv) {
           this.o_fetched.mutate(fet => [...fet, sv])
           const o_last = this.o_fetched.p(this.o_fetched.get().length - 1)
